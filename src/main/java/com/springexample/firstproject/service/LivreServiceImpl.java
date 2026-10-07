@@ -1,6 +1,7 @@
 package com.springexample.firstproject.service;
 
 import com.springexample.firstproject.entity.Livre;
+import com.springexample.firstproject.exception.LivreNotFoundException;
 import com.springexample.firstproject.repository.LivreRepository;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,7 @@ public class LivreServiceImpl implements LivreService {
     @Override
     public Livre getLivreByTitre(String titre) {
         return livreRepository.findByTitre(titre)
-                .orElseThrow(() -> new RuntimeException("Livre non trouvé"));
+                .orElseThrow(() -> new LivreNotFoundException("Livre non trouvé"));
 
         /*return livreRepository.findAll().stream()
                 .filter(l -> l.getTitre().equalsIgnoreCase(titre))
@@ -39,7 +40,7 @@ public class LivreServiceImpl implements LivreService {
     @Override
     public Livre updateLivre(Long id, Livre livre) {
         Livre livreExistant = livreRepository.findById(id)
-                .orElseThrow( () -> new RuntimeException("Livre non trouvé"));
+                .orElseThrow( () -> new LivreNotFoundException("Livre non trouvé, id :" + id));
         livreExistant.setAnnee(livre.getAnnee());
         livreExistant.setAuteur(livre.getAuteur());
         livreExistant.setTitre(livre.getTitre());
@@ -49,7 +50,7 @@ public class LivreServiceImpl implements LivreService {
     @Override
     public void deleteLivre(Long id) {
         if (!livreRepository.existsById(id)) {
-            throw new RuntimeException("Livre non trouvé");
+            throw new LivreNotFoundException("Livre non trouvé");
         }
         livreRepository.deleteById(id);
     }
