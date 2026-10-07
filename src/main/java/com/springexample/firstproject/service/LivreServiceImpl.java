@@ -22,9 +22,35 @@ public class LivreServiceImpl implements LivreService {
 
     @Override
     public Livre getLivreByTitre(String titre) {
-        return livreRepository.findAll().stream()
+        return livreRepository.findByTitre(titre)
+                .orElseThrow(() -> new RuntimeException("Livre non trouvé"));
+
+        /*return livreRepository.findAll().stream()
                 .filter(l -> l.getTitre().equalsIgnoreCase(titre))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Livre non trouvé"));
+                .orElseThrow(() -> new RuntimeException("Livre non trouvé"));*/
+    }
+
+    @Override
+    public Livre createLivre(Livre livre) {
+        return livreRepository.save(livre);
+    }
+
+    @Override
+    public Livre updateLivre(Long id, Livre livre) {
+        Livre livreExistant = livreRepository.findById(id)
+                .orElseThrow( () -> new RuntimeException("Livre non trouvé"));
+        livreExistant.setAnnee(livre.getAnnee());
+        livreExistant.setAuteur(livre.getAuteur());
+        livreExistant.setTitre(livre.getTitre());
+        return livreRepository.save(livreExistant);
+    }
+
+    @Override
+    public void deleteLivre(Long id) {
+        if (!livreRepository.existsById(id)) {
+            throw new RuntimeException("Livre non trouvé");
+        }
+        livreRepository.deleteById(id);
     }
 }
