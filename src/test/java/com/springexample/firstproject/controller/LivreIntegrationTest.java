@@ -97,12 +97,6 @@ class LivreIntegrationTest {
     void shouldCreateThenDeleteLivre() throws Exception {
         Livre livre = Livre.builder().titre("Dune").auteur("Herbert").annee(1965).build();
 
-        ResultActions result = mockMvc.perform(post("/livres")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(livre)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").isNumber());
-
         String json = mockMvc.perform(post("/livres")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(livre)))

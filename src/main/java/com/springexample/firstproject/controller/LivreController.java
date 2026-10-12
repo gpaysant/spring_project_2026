@@ -2,6 +2,7 @@ package com.springexample.firstproject.controller;
 
 import com.springexample.firstproject.entity.Livre;
 import com.springexample.firstproject.service.LivreService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,12 +27,12 @@ public class LivreController {
     }
 
     @PostMapping("/livres")
-    public Livre addLivre(@RequestBody Livre livre) {
+    public Livre addLivre(@Valid @RequestBody Livre livre) {
         return livreService.createLivre(livre);
     }
 
     @PutMapping("/livres/{id}")
-    public Livre updateLivre(@PathVariable Long id, @RequestBody Livre livre) {
+    public Livre updateLivre(@PathVariable Long id, @Valid @RequestBody Livre livre) {
         return livreService.updateLivre(id, livre);
     }
 

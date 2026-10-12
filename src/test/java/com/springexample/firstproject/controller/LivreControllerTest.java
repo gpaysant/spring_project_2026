@@ -133,9 +133,22 @@ class LivreControllerTest {
     }
 
     @Test
-    void shouldReturn400WithGenericMessageOnUnexpectedError() throws Exception {
+    void shouldReturn404WithGenericMessageOnUnexpectedError() throws Exception {
         mockMvc.perform(get("/liv"))
                 .andExpect(status().isNotFound())
                 .andExpect(content().string("Ressource introuvable"));
+    }
+
+    @Test
+    void shouldReturn400WhenLivreWithBadValues() throws Exception {
+        Long livreId = 1L;
+        Livre updated = Livre.builder().id(livreId).titre("1984").auteur("").annee(1985).build();
+
+        mockMvc.perform(put("/livres/{id}", livreId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updated)))
+                .andExpect(status().isBadRequest());
+
+        verify(livreService, never()).updateLivre(any(), any());
     }
 }
