@@ -2,13 +2,20 @@ package com.springexample.firstproject.controller;
 
 import com.springexample.firstproject.entity.Livre;
 import com.springexample.firstproject.exception.LivreNotFoundException;
+import com.springexample.firstproject.security.SecurityConfig;
 import com.springexample.firstproject.service.LivreService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.context.WebApplicationContext;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
@@ -17,20 +24,33 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(LivreController.class)
+@Import(SecurityConfig.class)
 class LivreControllerTest {
 
-    @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private WebApplicationContext context;
 
     @MockitoBean
     private LivreService livreService;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setUp() {
+        // Cette configuration force MockMvc à inclure toute la chaîne Spring Security
+        this.mockMvc = MockMvcBuilders
+                .webAppContextSetup(context)
+                .apply(springSecurity())
+                .build();
+    }
 
     @Test
     void shouldReturnAllLivres() throws Exception {
@@ -56,6 +76,7 @@ class LivreControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "USER")
     void shouldCreateLivre() throws Exception {
         Livre livre = Livre.builder().titre("Dune").auteur("Herbert").annee(1965).build();
         when(livreService.createLivre(any(Livre.class))).thenReturn(livre);
@@ -70,6 +91,7 @@ class LivreControllerTest {
     }
 
    @Test
+   @WithMockUser(roles = "ADMIN")
    void shouldUpdateLivre() throws Exception {
        Long livreId = 1L;
        Livre input = Livre.builder().id(livreId).titre("1984").auteur("Orwell").annee(1949).build();
@@ -87,6 +109,7 @@ class LivreControllerTest {
    }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturn404WhenLivreToUpdateNotFound() throws Exception {
         Long livreId = 99L;
         Livre input = Livre.builder().id(livreId).titre("1984").auteur("Orwell").annee(1949).build();
@@ -100,6 +123,7 @@ class LivreControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldDeleteLivre() throws Exception {
         Long livreId = 1L;
 
@@ -110,6 +134,7 @@ class LivreControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturn404WhenLivreNotFoundForDeleteLivre() throws Exception {
         Long livreId = 99L;
         doThrow(new LivreNotFoundException("Livre non trouvé, id : " + livreId))
@@ -133,6 +158,7 @@ class LivreControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "USER")
     void shouldReturn404WithGenericMessageOnUnexpectedError() throws Exception {
         mockMvc.perform(get("/liv"))
                 .andExpect(status().isNotFound())
@@ -140,6 +166,7 @@ class LivreControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = "ADMIN")
     void shouldReturn400WhenLivreWithBadValues() throws Exception {
         Long livreId = 1L;
         Livre updated = Livre.builder().id(livreId).titre("1984").auteur("").annee(1985).build();
@@ -148,6 +175,48 @@ class LivreControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updated)))
                 .andExpect(status().isBadRequest());
+
+        verify(livreService, never()).updateLivre(any(), any());
+    }
+
+    @Test
+    void shouldReturn401WhenCreatingWithoutAuthentication() throws Exception {
+        Livre livre = Livre.builder().id(1L).titre("1984").auteur("Orwell").annee(1949).build();
+        mockMvc.perform(post("/livres")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(livre)))
+                .andExpect(status().isUnauthorized());
+
+        verify(livreService, never()).createLivre(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void shouldReturn403WhenUserTriesToDelete() throws Exception {
+        mockMvc.perform(delete("/livres/{id}", 1L))
+                .andExpect(status().isForbidden());
+
+        verify(livreService, never()).deleteLivre(any());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void shouldDeleteLivreWhenAdmin() throws Exception {
+        mockMvc.perform(delete("/livres/{id}", 1L))
+                .andExpect(status().isOk());
+
+        verify(livreService).deleteLivre(1L);
+    }
+
+    @Test
+    void shouldReturn401WhenModifyingWithoutAuthentication() throws Exception {
+        Long livreId = 1L;
+        Livre updated = Livre.builder().id(livreId).titre("1984").auteur("Orwell").annee(1985).build();
+
+        mockMvc.perform(put("/livres/{id}", livreId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updated)))
+                .andExpect(status().isUnauthorized());
 
         verify(livreService, never()).updateLivre(any(), any());
     }

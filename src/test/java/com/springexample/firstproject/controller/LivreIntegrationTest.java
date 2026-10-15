@@ -14,6 +14,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import static org.hamcrest.Matchers.any;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -41,6 +42,7 @@ class LivreIntegrationTest {
         Livre livre = Livre.builder().titre("Dune").auteur("Herbert").annee(1965).build();
 
         mockMvc.perform(post("/livres")
+                        .with(httpBasic("user", "user123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(livre)))
                 .andExpect(status().isOk())
@@ -64,6 +66,7 @@ class LivreIntegrationTest {
         Livre livre = Livre.builder().titre("Dune").auteur("Herbert").annee(1965).build();
 
         String json = mockMvc.perform(post("/livres")
+                        .with(httpBasic("admin", "admin123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(livre)))
                 .andExpect(status().isOk())
@@ -73,6 +76,7 @@ class LivreIntegrationTest {
         Livre updatedLivre = Livre.builder().titre("Lune").auteur("Bebert").annee(1970).build();
 
         mockMvc.perform(put("/livres/{id}", livreId)
+                        .with(httpBasic("admin", "admin123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(updatedLivre)))
                 .andExpect(status().isOk())
@@ -81,10 +85,12 @@ class LivreIntegrationTest {
                 .andExpect(jsonPath("$.auteur").value(updatedLivre.getAuteur()))
                 .andExpect(jsonPath("$.annee").value(updatedLivre.getAnnee()));
 
-        mockMvc.perform(get("/livres/Dune"))
+        mockMvc.perform(get("/livres/Dune")
+                        .with(httpBasic("admin", "admin123")))
                 .andExpect(status().isNotFound());
 
-        mockMvc.perform(get("/livres/Lune"))
+        mockMvc.perform(get("/livres/Lune")
+                    .with(httpBasic("admin", "admin123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.titre").value(updatedLivre.getTitre()))
                 .andExpect(jsonPath("$.auteur").value(updatedLivre.getAuteur()))
@@ -98,13 +104,15 @@ class LivreIntegrationTest {
         Livre livre = Livre.builder().titre("Dune").auteur("Herbert").annee(1965).build();
 
         String json = mockMvc.perform(post("/livres")
+                        .with(httpBasic("admin", "admin123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(livre)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         Long livreId = objectMapper.readValue(json, Livre.class).getId();
 
-        mockMvc.perform(delete("/livres/{id}", livreId))
+        mockMvc.perform(delete("/livres/{id}", livreId)
+                        .with(httpBasic("admin", "admin123")))
                 .andExpect(status().isOk());
 
         assertEquals(0, livreRepository.count());
@@ -114,6 +122,7 @@ class LivreIntegrationTest {
     void shouldReturn404WhenUpdatingUnknownLivre() throws Exception {
         Livre livre = Livre.builder().titre("Dune").auteur("Herbert").annee(1965).build();
         mockMvc.perform(put("/livres/{id}", Long.MAX_VALUE)
+                        .with(httpBasic("user", "user123"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(livre)))
                 .andExpect(status().isNotFound());
@@ -121,7 +130,46 @@ class LivreIntegrationTest {
 
     @Test
     void shouldReturn404DeleteLivre() throws Exception {
-        mockMvc.perform(delete("/livres/{id}", 99L))
+        mockMvc.perform(delete("/livres/{id}", 99L)
+                        .with(httpBasic("admin", "admin123")))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void shouldReturn401WhenCredentialsAreWrongOnProtectedEndpoint() throws Exception {
+        Livre livre = Livre.builder().titre("Dune").auteur("Herbert").annee(1965).build();
+
+        mockMvc.perform(post("/livres")
+                        .with(httpBasic("user", "faux"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(livre)))
+                .andExpect(status().isUnauthorized());
+
+        assertEquals(0, livreRepository.count());
+    }
+
+    @Test
+    void shouldReturn401WhenCredentialsAreWrongEvenOnPublicEndpoint() throws Exception {
+        mockMvc.perform(get("/livres").with(httpBasic("admin", "faux")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturn403WhenTryToDeleteLivre() throws Exception {
+        Livre livre = Livre.builder().titre("Dune").auteur("Herbert").annee(1965).build();
+
+        String json = mockMvc.perform(post("/livres")
+                        .with(httpBasic("user", "user123"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(livre)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Long livreId = objectMapper.readValue(json, Livre.class).getId();
+
+        mockMvc.perform(delete("/livres/{id}", livreId)
+                    .with(httpBasic("user", "user123")))
+                .andExpect(status().isForbidden());
+
+        assertEquals(1, livreRepository.count());
     }
 }
